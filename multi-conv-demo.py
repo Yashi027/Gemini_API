@@ -1,6 +1,7 @@
 from google import genai
 from dotenv import load_dotenv
 import os
+import time
 
 load_dotenv()
 
@@ -14,6 +15,7 @@ client = genai.Client(
 )
 
 history = []
+MAX_HISTORY=20
 
 system_prompt = """
 You are a friendly AI assistant
@@ -26,24 +28,37 @@ print("====Gemini Chatbot====")
 
 while True:
     user_input = input("Prompt: ")
-    if user_input.lower in ["bye","exit","quit"]:
+    if user_input.lower() in ["bye","exit","quit"]:
         break
     history.append(f"User: {user_input}")
+
+    if len(history) > MAX_HISTORY:
+        history = history[-MAX_HISTORY:]
+
     conversational_context = system_prompt+ "\n"
     conversational_context += "\n".join(history)
 
+    start_time = time.time()
+    fullResponse = ""
+
     try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
+        stream = client.models.generate_content_stream(
+            model="gemini-3.1-flash-lite",
             contents=conversational_context
         )
 
-        bot_response = response.text
+        for chunk in stream:
+            if chunk.text:
+                print(chunk.text, end="", flush=True)
+                fullResponse += chunk.text
 
-        print("Gemini: {bot_response}")
+        endTime = time.time()
+        total_time = endTime-start_time
+        print(f"\n Response time: {total_time}")
 
-        history.append(f"Assisstant: {bot_response}")
+        history.append(f"Assisstant: {fullResponse}")
     except Exception as ex:
-        print("Gemini service temporarily unavailable")
+        print("Error")
+        print(ex)
         continue
     
